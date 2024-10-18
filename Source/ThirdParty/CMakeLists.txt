@@ -202,7 +202,6 @@ if (URHO3D_PROFILING)
 endif ()
 
 if (URHO3D_PROFILING)
-    # Tracy's headers are included even in non-profiled builds in order to provide stub profiler macros.
     set (TRACY_ON_DEMAND ON)
     add_subdirectory(tracy)
 
@@ -221,11 +220,26 @@ if (URHO3D_PROFILING)
         set(NO_FILESELECTOR ON)
         add_subdirectory(tracy/profiler)
     endif ()
+else ()
+    add_library(TracyClient INTERFACE)
+    target_include_directories(TracyClient INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/tracy/public>)
 endif ()
+
+# Tracy's headers are included even in non-profiled builds in order to provide stub profiler macros.
+install_third_party_libs(TracyClient)
+target_include_directories(TracyClient SYSTEM INTERFACE $<INSTALL_INTERFACE:${DEST_THIRDPARTY_HEADERS_DIR}/tracy>)
+
+foreach (dir common client tracy libbacktrace)
+    install (DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tracy/public/${dir} DESTINATION ${DEST_THIRDPARTY_HEADERS_DIR}/tracy/
+        PATTERN ".+\\.h(pp)?$"
+        PATTERN "TracyClient\\.cpp" EXCLUDE
+        PATTERN ".+/tracy/Tracy(OpenCL|Vulkan).hpp" EXCLUDE)
+endforeach ()
 
 set (DILIGENT_INSTALL_CORE OFF CACHE BOOL "" FORCE)
 set (DILIGENT_NO_GLSLANG ON CACHE BOOL "" FORCE)
 set (DILIGENT_NO_HLSL ON CACHE BOOL "" FORCE)
+set (DILIGENT_NO_ARCHIVER ON CACHE BOOL "" FORCE)
 assign_bool (DILIGENT_NO_OPENGL URHO3D_GRAPHICS_NO_GL)
 assign_bool (DILIGENT_NO_DIRECT3D11 URHO3D_GRAPHICS_NO_D3D11)
 assign_bool (DILIGENT_NO_DIRECT3D12 URHO3D_GRAPHICS_NO_D3D12)
@@ -236,7 +250,7 @@ if (NOT URHO3D_DEBUG_GRAPHICS)
 else ()
     set (DILIGENT_MSVC_DEBUG_COMPILE_OPTIONS "" CACHE STRING "" FORCE)
 endif ()
-add_subdirectory (Diligent)
+add_subdirectory (Diligent EXCLUDE_FROM_ALL)
 install_third_party_libs (
     Diligent-AndroidPlatform
     Diligent-ApplePlatform
@@ -248,10 +262,8 @@ install_third_party_libs (
     Diligent-EmscriptenPlatform
     Diligent-GraphicsAccessories
     Diligent-GraphicsEngine
-    Diligent-GraphicsEngineD3D11-shared
     Diligent-GraphicsEngineD3D11-static
     Diligent-GraphicsEngineD3D11Interface
-    Diligent-GraphicsEngineD3D12-shared
     Diligent-GraphicsEngineD3D12-static
     Diligent-GraphicsEngineD3D12Interface
     Diligent-GraphicsEngineD3DBase
@@ -298,8 +310,11 @@ if (URHO3D_XR)
         set (BUILD_LOADER ON CACHE BOOL "" FORCE)
     endif ()
 
-    add_subdirectory(OpenXRSDK)
+    add_subdirectory(OpenXRSDK EXCLUDE_FROM_ALL)
     install_third_party_libs(openxr_loader)
+
+    install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/OpenXRSDK/include/openxr DESTINATION ${DEST_THIRDPARTY_HEADERS_DIR})
+    target_include_directories(openxr_loader INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/OpenXRSDK/include>)
 endif ()
 
 # When crosscompiling, swig will be built as part of native tools build. See Source/CMakeLists.txt.
