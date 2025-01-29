@@ -72,14 +72,16 @@ void DataChannelConnection::SendMessage(ea::string_view data, PacketTypeFlags ty
         return;
     }
 
-    if (data.size() > maxDataSize_)
-    {
-        URHO3D_LOGERROR("DataChannel tried to send {} bytes of data, which is more than max allowed {} bytes of data per message.",
-            data.size(), maxDataSize_);
-        return;
-    }
     if (auto* dc = dataChannels_[type].get())
     {
+        const auto maxMessageSize = dc->maxMessageSize();
+        if (data.size() > maxMessageSize)
+        {
+            URHO3D_LOGERROR("DataChannel tried to send {} bytes of data, which is more than max allowed {} bytes of data per message.",
+                data.size(), maxMessageSize);
+            return;
+        }
+
         if (dc->isOpen())
         {
             dc->send((const std::byte*)data.data(), data.size());
@@ -91,6 +93,18 @@ void DataChannelConnection::SendMessage(ea::string_view data, PacketTypeFlags ty
         URHO3D_LOGERROR("DataChannel {} is not connected!", (int)type);
         Disconnect();
     }
+}
+
+unsigned DataChannelConnection::GetMaxMessageSize() const
+{
+    if (state_ != State::Connected || !dataChannels_[0])
+        return 0;
+
+#if URHO3D_PLATFORM_WEB
+    return MaxNetworkPacketSize;
+#else
+    return static_cast<unsigned>(dataChannels_[0]->maxMessageSize());
+#endif
 }
 
 void DataChannelConnection::OnDataChannelConnected(int index)
